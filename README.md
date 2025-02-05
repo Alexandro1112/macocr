@@ -1,5 +1,6 @@
 # TextRecognitionMacOs
 Simple utility for recognizing text on an image, supports many languages!
+
 ▎Usage
 
 Here's a quick example of how to use recog_lib to recognize text from an image:
