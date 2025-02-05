@@ -2,8 +2,8 @@ import Vision
 
 
 class Recognition:
-    def get_info_from_image(self, img, info):
-        self.info = info
+    def get_info_from_image(self, img, output_format):
+        self.info = output_format
 
         def handle(request, error):
             self.output = []
