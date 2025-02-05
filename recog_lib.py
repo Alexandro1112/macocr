@@ -1,4 +1,5 @@
 import Vision
+import Cocoa
 
 
 class Recognition:
@@ -16,18 +17,19 @@ class Recognition:
                             abst_position = result.boundingBox()
                             self.output.append(abst_position)
                         else:
-                            return None
+                            pass
 
         def recognize(img):
-            image = Vision.NSImage.alloc().initWithContentsOfFile_(img)
-            if image is None:
+            try:
+                image = Vision.NSImage.alloc().initWithContentsOfFile_(img).TIFFRepresentation()
+            except AttributeError:
                 raise FileNotFoundError('Failed to load image..')
-            rep = image.representations()[0]
-            cg_image = rep.CGImage()
-            req_handler = Vision.VNImageRequestHandler.alloc().initWithCGImage_options_(cg_image, None)
+            cg = Cocoa.NSBitmapImageRep.imageRepWithData_(image).CGImage()
+            req_handler = Vision.VNImageRequestHandler.alloc().initWithCGImage_options_(cg, None)
             request = Vision.VNRecognizeTextRequest.alloc().initWithCompletionHandler_(handle)
             req_handler.performRequests_error_([request], None)
         recognize(img)
 
     def return_results(self):
+        """Call this method because when we try return any data through handle we get an error."""
         return self.output
