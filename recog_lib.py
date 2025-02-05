@@ -10,28 +10,30 @@ class Recognition:
             self.all = {}
             self.output_txt = []
             self.output_crd = []
-            
+
             for result in request.results():
                 if isinstance(result, Vision.VNRecognizedTextObservation):
                     for texts in result.topCandidates_(1):
-                        
                         if self.info == 'text':
                             self.output_txt.append(texts.string())
-                            
-                        elif self.info == 'coord':
+                            self.all = {}
+
+                        if self.info == 'coord':
                             self.output_crd.append(result.boundingBox())
-                            
+                            self.all = {}
+
                         elif self.info == 'coord+text' or self.info == 'text+coord':
                             self.output_txt.append(texts.string())
                             self.output_crd.append(result.boundingBox())
                             self.all.update(
                                 {
-                                        'coord': self.output_crd,
-                                        'text': self.output_txt
+                                    'coord': self.output_crd,
+                                    'text': self.output_txt
                                 }
                             )
+
                         else:
-                            pass #???
+                            pass
 
         def recognize(img):
             try:
@@ -49,13 +51,12 @@ class Recognition:
         recognize(img)
 
     def return_results(self):
-        """Call this method because when we try return any data through handle we get an error."""
-        if self.all is {}: 
+
+        """Call this method because when we try to return any data through the handle, we get an error."""
+        if self.all == {}:
             return self.output_txt or self.output_crd
-        return self.all
-
-
-
+        else:
+            return self.all
 
 
 
