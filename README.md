@@ -9,13 +9,11 @@ Here's a quick example of how to use recog_lib to recognize text from an image:
 import TextRecognitionMacOs
 
 # Create an instance of the Recognition class
-r = TextRecognitionMacOs.Recognition()
+sh = TextRecognitionMacOs.Recognition(img='/Users/aleksandr/russian_text.jpeg',
+                                   output_format='coord')
 
-# Get information from the specified image
-r.get_info_from_image('/Users/aleksandr/russian_text.jpeg', 'coord')
+print(sh.return_results())
 
-# Print the recognized results
-print(r.return_results())
 ```
 
 ▎Parameters
@@ -33,13 +31,10 @@ print(r.return_results())
 <br><br>Also you can print coordinates and text, use format ``text+coord``. Here's example
 
 ```
-import speech_recognition
+import TextRecognitionMacOs
 
 # Create an instance of the Recognition class
-r = speech_recognition.Recognition()
-
-# Get information from the specified image
-r.get_info_from_image('/Users/aleksandr/russian_text.jpeg', 'text+coord')
+r = speech_recognition.Recognition('/Users/aleksandr/russian_text.jpeg', 'text+coord')
 
 dictionary = r.return_results()
 text = dictionary['text']
