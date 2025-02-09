@@ -1,7 +1,7 @@
 import Vision
 import Cocoa
 import re
-from typing import Dict, SupportsFloat, SupportsInt, List, AnyStr, Tuple, Any
+from typing import Dict, SupportsFloat, SupportsInt, List, AnyStr, Tuple
 import objc
 from collections.abc import Iterable
 
@@ -31,7 +31,7 @@ class Recognition:
                  output_format='text',
                  lang='en-US',
                  use_CPU=None,
-                 recognition_interest: List[Tuple[float | int, float | int]] = None
+                 recognition_interest: List[Tuple[float | int, float | int]] = None,
                  ) -> None:
         self.info = output_format
         self.lang = lang
@@ -82,6 +82,7 @@ class Recognition:
                                     'text': self.output_txt,
                                     'confidence': self.output_cnf
                             })
+
                         else:
                             pass
 
@@ -99,6 +100,9 @@ class Recognition:
                 image = Vision.NSImage.alloc().initWithContentsOfFile_(
                     Vision.CFSTR(img)
                 ).TIFFRepresentation()
+                size = Vision.NSImage.alloc().initWithContentsOfFile_(Vision.CFSTR(img)).size()
+                self.width = size.width
+                self.height = size.height
 
             except AttributeError:
                 raise FileNotFoundError('Failed to load image.') from None
@@ -133,7 +137,7 @@ class Recognition:
 
         recognize(img)
         
-    @objc.python_method
+    @objc.python_method()
     def return_results(self) -> Dict[AnyStr, SupportsInt] | List[SupportsFloat]:
         """I created this method because when we try to return any data through a handle, we get an error.
          The Objc method cannot keep or return any values."""
@@ -144,3 +148,7 @@ class Recognition:
 
     def text_lang(self):
         return self.request.recognitionLanguages()
+
+    def image_size(self):
+        """return image width and height."""
+        return [self.width, self.height]
