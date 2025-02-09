@@ -1,14 +1,15 @@
 import Vision
 import Cocoa
 import re
-from typing import Dict, SupportsFloat, SupportsInt, List, AnyStr
+from typing import Dict, SupportsFloat, SupportsInt, List, AnyStr, Tuple, Any
 import objc
+from collections.abc import Iterable
 
 
 class Recognition:
     """
     Class create Recognition object
-    and accept
+    and accept:
 
     :argument img: path to require image, can not contain Cyrillic characters.
 
@@ -20,30 +21,41 @@ class Recognition:
     :argument use_CPU: This method (or property) allows you to specify that text recognition should be performed only on
      the central processing unit (CPU) rather than on the graphics processing unit (GPU). This can be useful in
      certain scenarios, for example, when it is important to reduce the load on the device's hardware resources.
+
+    :argument recognition_interest: argument accept dict with coordinates, this is need for a limit text recognition by
+    x, y, width and height coordinates.
+
     """
     def __init__(self,
-                 img,
+                 img: str,
                  output_format='text',
-                 lang=None,
+                 lang='en-US',
                  use_CPU=None,
+                 recognition_interest: List[Tuple[float | int, float | int]] = None
                  ) -> None:
         self.info = output_format
         self.lang = lang
         self.use_CPU = use_CPU
 
-        def handle(request, error):
+        def completion_handler_(request, error):
             """
             Create handler for accept recognized text and errors.
             """
+            if error is None: del error
             self.all = {}
             self.output_txt = []
             self.output_crd = []
             self.output_cnf = []
 
             def multiply_list(values):
+                """convert CGPoint to list with coordinates(x, y, width, and height)."""
                 for i in range(len(values)):
-                    bounds = [values[i].x, values[i].y, values.size.width, values.size.height]
-                    return [round(b * 1000) for b in bounds]
+                    return [values[i].x, values[i].y, values.size.width, values.size.height]
+
+            if not isinstance(request.results(), Iterable) and recognition_interest is not None:
+                self.output_txt.append([]) # If we limit text recognition by coordinates, and if nothing is found at the
+                # given coordinates, then we return an empty dictionary.
+                return
 
             for result in request.results():
                 if isinstance(result, Vision.VNRecognizedTextObservation):
@@ -53,15 +65,15 @@ class Recognition:
                             self.output_txt.append(text.string())
                             self.all = {}
 
-                        if self.info == 'coord':
+                        elif self.info == 'coord':
                             self.output_crd.append(multiply_list(result.boundingBox()))
                             self.all = {}
 
-                        if self.info == 'confidence':
+                        elif self.info == 'confidence':
                             self.output_cnf.append(text.confidence())
                             self.all = {}
 
-                        if all(word in self.info for word in ['text', 'coord', 'confidence']):
+                        elif all(word in self.info for word in ['text', 'coord', 'confidence']):
                             self.output_txt.append(text.string())
                             self.output_crd.append(multiply_list(result.boundingBox()))
                             self.output_cnf.append(result.confidence())
@@ -75,7 +87,6 @@ class Recognition:
 
         def recognize(img: Vision.CFSTR) -> None:
             pattern = r'[а-яА-ЯёЁ]'
-
             if bool(var := re.search(pattern, img)):
                 raise SyntaxError(
                     f'The path to the file must\'t contain Cyrillic characters started on {var.start() + 1!r}.'
@@ -99,10 +110,21 @@ class Recognition:
             req_handler = Vision.VNImageRequestHandler.alloc().initWithCGImage_options_(
                 cg, None
             )
-            self.request = Vision.VNRecognizeTextRequest.alloc().initWithCompletionHandler_(handle)
+            self.request = Vision.VNRecognizeTextRequest.alloc().initWithCompletionHandler_(completion_handler_)
             self.request.setRevision_(Vision.VNRecognizeTextRequestRevision3)
 
-            if self.lang is not None:
+            if recognition_interest is not None:
+                self.request.setRegionOfInterest_(
+                    Cocoa.CGRect(recognition_interest[0])
+                )
+            elif recognition_interest is None:
+                pass
+            else:
+                raise ValueError(
+                    'Recognition interest has wrong type or values.'
+                )
+
+            if not self.lang == 'en-US':
                 self.request.setRecognitionLanguages_(lang)
             if self.use_CPU is not None:
                 self.request.setUsesCPUOnly_(True)
