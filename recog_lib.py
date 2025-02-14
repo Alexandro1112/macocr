@@ -1,7 +1,7 @@
 import Vision
 import Cocoa
 import re
-from typing import Dict, SupportsFloat, SupportsInt, List, AnyStr, Tuple
+from typing import Dict, SupportsFloat, SupportsInt, List, AnyStr, Tuple, Literal
 import objc
 from collections.abc import Iterable
 
@@ -23,12 +23,12 @@ class Recognition:
      certain scenarios, for example, when it is important to reduce the load on the device's hardware resources.
 
     :argument recognition_interest: argument accept dict with coordinates, this is need for a limit text recognition by
-    x, y, width and height coordinates.
+    x, y, width and height coordinates. Default values: (0, 0), (1, 1).
 
     """
     def __init__(self,
                  img: str,
-                 output_format='text',
+                 output_format: Literal['text', 'coord', 'confidence'] = 'text',
                  lang='en-US',
                  use_CPU=None,
                  recognition_interest: List[Tuple[float | int, float | int]] = None,
@@ -39,7 +39,7 @@ class Recognition:
 
         def completion_handler_(request, error):
             """
-            Create handler for accept recognized text and errors.
+            Create handler for accept recognized text.
             """
             if error is None: del error
             self.all = {}
@@ -84,9 +84,10 @@ class Recognition:
                             })
 
                         else:
-                            pass
+                            return None
 
-        def recognize(img: Vision.CFSTR) -> None:
+        def recognize(img) -> None:
+
             pattern = r'[а-яА-ЯёЁ]'
             if bool(var := re.search(pattern, img)):
                 raise SyntaxError(
@@ -98,11 +99,12 @@ class Recognition:
 
             try:
                 image = Vision.NSImage.alloc().initWithContentsOfFile_(
-                    Vision.CFSTR(img)
+                    Cocoa.CFSTR(img)
                 ).TIFFRepresentation()
-                size = Vision.NSImage.alloc().initWithContentsOfFile_(Vision.CFSTR(img)).size()
-                self.width = size.width
-                self.height = size.height
+                size = Vision.NSImage.alloc().initWithContentsOfFile_(Cocoa.CFSTR(img)).size()
+
+                self.width = int(size.width)
+                self.height = int(size.height)
 
             except AttributeError:
                 raise FileNotFoundError('Failed to load image.') from None
@@ -110,19 +112,26 @@ class Recognition:
             cg = Cocoa.NSBitmapImageRep.imageRepWithData_(
                 image
             ).CGImage()
-
             req_handler = Vision.VNImageRequestHandler.alloc().initWithCGImage_options_(
                 cg, None
             )
+
             self.request = Vision.VNRecognizeTextRequest.alloc().initWithCompletionHandler_(completion_handler_)
-            self.request.setRevision_(Vision.VNRecognizeTextRequestRevision3)
+            self.request.setRevision_error_(Vision.VNRecognizeTextRequestRevision3, None)
 
             if recognition_interest is not None:
-                self.request.setRegionOfInterest_(
-                    Cocoa.CGRect(recognition_interest[0])
-                )
+                try:
+                    self.request.setRegionOfInterest_(
+                        Cocoa.CGRect(*recognition_interest)
+                    )
+                except objc._objc.internal_error:
+                    raise ValueError('Recognition interest has wrong type or values.')
+
             elif recognition_interest is None:
-                pass
+                self.request.setRegionOfInterest_(
+                    Cocoa.CGRect((0, 0), (1, 1)) # Set as region of searching at all image. This described there
+                    # https://developer.apple.com/documentation/dockkit/dockaccessory/setregionofinterest(_:)/
+                )
             else:
                 raise ValueError(
                     'Recognition interest has wrong type or values.'
@@ -137,7 +146,7 @@ class Recognition:
 
         recognize(img)
         
-    @objc.python_method()
+    @objc.python_method
     def return_results(self) -> Dict[AnyStr, SupportsInt] | List[SupportsFloat]:
         """I created this method because when we try to return any data through a handle, we get an error.
          The Objc method cannot keep or return any values."""
@@ -149,6 +158,13 @@ class Recognition:
     def text_lang(self):
         return self.request.recognitionLanguages()
 
+    def supported_languages(self):
+        return self.request.supportedRecognitionLanguagesAndReturnError_(None)[0]
+
     def image_size(self):
         """return image width and height."""
         return [self.width, self.height]
+
+    def make_rect(self, coordinates):
+        raise NotImplementedError
+
