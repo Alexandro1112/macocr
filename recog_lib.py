@@ -28,7 +28,7 @@ class Recognition:
     """
     def __init__(self,
                  img: str,
-                 output_format: Literal['text', 'coord', 'confidence'] = 'text',
+                 output_format: Literal['text', 'coord', 'confidence'] | Iterable = 'text',
                  lang='en-US',
                  use_CPU=None,
                  recognition_interest: List[Tuple[float | int, float | int]] = None,
@@ -167,4 +167,6 @@ class Recognition:
 
     def make_rect(self, coordinates):
         raise NotImplementedError
+
+
 
