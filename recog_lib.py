@@ -1,5 +1,6 @@
 import Vision
 import Cocoa
+import Quartz
 import re
 from typing import Dict, SupportsFloat, SupportsInt, List, AnyStr, Tuple, Literal
 import objc
@@ -25,9 +26,13 @@ class Recognition:
     :argument recognition_interest: argument accept dict with coordinates, this is need for a limit text recognition by
     x, y, width and height coordinates. Default values: (0, 0), (1, 1).
 
+    :argument img_orientation: change image orientation,  accept ('default', 'up', 'down', 'left', 'right',
+    'right-mirrored', 'left-mirrored', 'up-mirrored', 'down-mirrored') values.
+
     """
     def __init__(self,
                  img: str,
+                 img_orientation='default',
                  output_format: Literal['text', 'coord', 'confidence'] | Iterable = 'text',
                  lang='en-US',
                  use_CPU=None,
@@ -37,11 +42,24 @@ class Recognition:
         self.lang = lang
         self.use_CPU = use_CPU
 
+        self.orientations = {
+            'default': 0,
+            'up': Quartz.kCGImagePropertyOrientationUp,
+            'down': Quartz.kCGImagePropertyOrientationDown,
+            'left': Quartz.kCGImagePropertyOrientationLeft,
+            'right': Quartz.kCGImagePropertyOrientationRight,
+            'right-mirrored': Quartz.kCGImagePropertyOrientationRightMirrored,
+            'left-mirrored': Quartz.kCGImagePropertyOrientationLeftMirrored,
+            'up-mirrored': Quartz.kCGImagePropertyOrientationUpMirrored,
+            'down-mirrored': Quartz.kCGImagePropertyOrientationDownMirrored,
+        }
+
         def completion_handler_(request, error):
             """
             Create handler for accept recognized text.
             """
-            if error is None: del error
+            if error is None:
+                del error
             self.all = {}
             self.output_txt = []
             self.output_crd = []
@@ -60,18 +78,19 @@ class Recognition:
             for result in request.results():
                 if isinstance(result, Vision.VNRecognizedTextObservation):
                     for text in result.topCandidates_(1):
+                        if len(self.info.split('+')) < 3:
 
-                        if self.info == 'text':
-                            self.output_txt.append(text.string())
-                            self.all = {}
+                            if 'text' in self.info.split('+'):
+                                self.output_txt.append(text.string())
+                                self.all = {}
 
-                        elif self.info == 'coord':
-                            self.output_crd.append(multiply_list(result.boundingBox()))
-                            self.all = {}
+                            if 'coord' in self.info.split('+'):
+                                self.output_crd.append(multiply_list(result.boundingBox()))
+                                self.all = {}
 
-                        elif self.info == 'confidence':
-                            self.output_cnf.append(text.confidence())
-                            self.all = {}
+                            elif 'confidence' in self.info.split('+'):
+                                self.output_cnf.append(text.confidence())
+                                self.all = {}
 
                         elif all(word in self.info for word in ['text', 'coord', 'confidence']):
                             self.output_txt.append(text.string())
@@ -87,16 +106,11 @@ class Recognition:
                             return None
 
         def recognize(img) -> None:
-
             pattern = r'[а-яА-ЯёЁ]'
             if bool(var := re.search(pattern, img)):
                 raise SyntaxError(
                     f'The path to the file must\'t contain Cyrillic characters started on {var.start() + 1!r}.'
                 )
-
-            if 'file:' in img:
-                img = img.replace('file:', '')
-
             try:
                 image = Vision.NSImage.alloc().initWithContentsOfFile_(
                     Cocoa.CFSTR(img)
@@ -112,10 +126,17 @@ class Recognition:
             cg = Cocoa.NSBitmapImageRep.imageRepWithData_(
                 image
             ).CGImage()
-            req_handler = Vision.VNImageRequestHandler.alloc().initWithCGImage_options_(
-                cg, None
-            )
 
+            try:
+                orient = self.orientations[img_orientation]
+            except KeyError:
+                raise ValueError(
+                    f'Orientation must be {repr((*self.orientations.keys(), ))}'
+                )
+
+            req_handler = Vision.VNImageRequestHandler.alloc().initWithCGImage_orientation_options_(
+                cg, orient, None
+            )
             self.request = Vision.VNRecognizeTextRequest.alloc().initWithCompletionHandler_(completion_handler_)
             self.request.setRevision_error_(Vision.VNRecognizeTextRequestRevision3, None)
 
@@ -125,7 +146,7 @@ class Recognition:
                         Cocoa.CGRect(*recognition_interest)
                     )
                 except objc._objc.internal_error:
-                    raise ValueError('Recognition interest has wrong type or values.')
+                    raise ValueError(f'recognition_interest has wrong type or values.')
 
             elif recognition_interest is None:
                 self.request.setRegionOfInterest_(
@@ -134,14 +155,13 @@ class Recognition:
                 )
             else:
                 raise ValueError(
-                    'Recognition interest has wrong type or values.'
+                    'recognition_interest has wrong type or values.'
                 )
 
             if not self.lang == 'en-US':
                 self.request.setRecognitionLanguages_(lang)
-            if self.use_CPU is not None:
-                self.request.setUsesCPUOnly_(True)
-
+            if self.use_CPU is True:
+                self.request.setUsesCPUOnly_(Vision.kCFBooleanTrue)
             req_handler.performRequests_error_([self.request], None)
 
         recognize(img)
@@ -149,9 +169,10 @@ class Recognition:
     @objc.python_method
     def return_results(self) -> Dict[AnyStr, SupportsInt] | List[SupportsFloat]:
         """I created this method because when we try to return any data through a handle, we get an error.
-         The Objc method cannot keep or return any values."""
+         The Objc method cannot return or save any values."""
         if self.all == {}:
-            return self.output_txt or self.output_crd or self.output_cnf
+            return [sublist for sublist in [self.output_txt, self.output_crd , self.output_cnf] if sublist]
+
         else:
             return self.all
 
@@ -164,9 +185,3 @@ class Recognition:
     def image_size(self):
         """return image width and height."""
         return [self.width, self.height]
-
-    def make_rect(self, coordinates):
-        raise NotImplementedError
-
-
-
