@@ -36,16 +36,15 @@ Parameters
 
 import TextRecognitionMacOs as rc
 
-params = 'text+coord'
-for i in params.split('+'):
-    rec = rc.Recognition(
-        img='/Users/aleksandr/Desktop/screenshot.png',
-        lang='ru-RU',
-        output_format=i,
-        use_CPU=True,
-        recognition_interest=[
-            (0, 0), (0.5, 0.5)
-        ]
-    )
-    print(rec.return_results())
+
+rec = rc.Recognition(
+    img='file2.png',
+    lang='ru-RU',
+    output_format='coord+text',
+    use_CPU=True,
+
+)
+
+print(rec.return_results())
+
 ```
