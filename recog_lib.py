@@ -9,13 +9,15 @@ from collections.abc import Iterable
 
 class Recognition:
     """
-    Class create Recognition object
-    and accept:
+    Class create Recognition object which accept:
 
-    :argument img: path to require image, can not contain Cyrillic characters.
+    :argument img: The path to the required image cannot contain Cyrillic characters. Assign an image path or file name if
+     it is in the same directory.
 
-    :argument output_format: explanation of what we need to return, text if we need text from image. coord,
-    if a need get a coordinates of text, confidence if we need get accurate of recognized text in float values.
+    :argument output_format:
+    an explanation of what we need to return: text if we need text from the image. coordinate,
+    if we need to get the coordinates of the text, confidence if we need to get the accuracy of the recognized text
+    in floating point values.
 
     :argument lang: language of recognition text, if text contain more 2 languages keep lang at ``en-US``.
 
@@ -26,10 +28,11 @@ class Recognition:
     :argument recognition_interest: argument accept dict with coordinates, this is need for a limit text recognition by
     x, y, width and height coordinates. Default values: (0, 0), (1, 1).
 
-    :argument img_orientation: change image orientation,  accept ('default', 'up', 'down', 'left', 'right',
-    'right-mirrored', 'left-mirrored', 'up-mirrored', 'down-mirrored') values.
+    :argument img_orientation: change the image orientation, which is applied before the image is initialized
+    using VNRecognizeTextRequest.
 
     """
+
     def __init__(self,
                  img: str,
                  img_orientation='default',
@@ -38,6 +41,7 @@ class Recognition:
                  use_CPU=None,
                  recognition_interest: List[Tuple[float | int, float | int]] = None,
                  ) -> None:
+
         self.info = output_format
         self.lang = lang
         self.use_CPU = use_CPU
@@ -58,8 +62,10 @@ class Recognition:
             """
             Create handler for accept recognized text.
             """
-            if error is None:
-                del error
+            if error is not None:
+                raise Exception(error.localizedDescription())
+            del error
+
             self.all = {}
             self.output_txt = []
             self.output_crd = []
@@ -68,7 +74,15 @@ class Recognition:
             def multiply_list(values):
                 """convert CGPoint to list with coordinates(x, y, width, and height)."""
                 for i in range(len(values)):
-                    return [values[i].x, values[i].y, values.size.width, values.size.height]
+                    bound_box = [round(_xy, 2) for _xy in
+                                 (values[i].x, values[i].y, values.size.width, values.size.height)]
+                    x, y, w, h = bound_box
+                    x_1 = x * self.width
+                    y_2 = (1 - y) * self.height
+                    x_2 = x_1 + w * self.width
+                    y_1 = y_2 - h * self.height
+
+                    return x_1, y_1, x_2, y_2
 
             if not isinstance(request.results(), Iterable) and recognition_interest is not None:
                 self.output_txt.append([]) # If we limit text recognition by coordinates, and if nothing is found at the
@@ -113,15 +127,15 @@ class Recognition:
                 )
             try:
                 image = Vision.NSImage.alloc().initWithContentsOfFile_(
-                    Cocoa.CFSTR(img)
+                    Cocoa.CFSTR(img.strip())
                 ).TIFFRepresentation()
-                size = Vision.NSImage.alloc().initWithContentsOfFile_(Cocoa.CFSTR(img)).size()
+                size = Vision.NSImage.alloc().initWithContentsOfFile_(Cocoa.CFSTR(img.strip())).size()
 
                 self.width = int(size.width)
                 self.height = int(size.height)
 
             except AttributeError:
-                raise FileNotFoundError('Failed to load image.') from None
+                raise FileNotFoundError(f'Failed to load image') from None
 
             cg = Cocoa.NSBitmapImageRep.imageRepWithData_(
                 image
@@ -162,16 +176,19 @@ class Recognition:
                 self.request.setRecognitionLanguages_(lang)
             if self.use_CPU is True:
                 self.request.setUsesCPUOnly_(Vision.kCFBooleanTrue)
-            req_handler.performRequests_error_([self.request], None)
+
+            with objc.autorelease_pool():
+                if req_handler.isMemberOfClass_(Vision.VNImageRequestHandler):
+                    req_handler.performRequests_error_([self.request], None)
 
         recognize(img)
-        
+
     @objc.python_method
     def return_results(self) -> Dict[AnyStr, SupportsInt] | List[SupportsFloat]:
         """I created this method because when we try to return any data through a handle, we get an error.
          The Objc method cannot return or save any values."""
-        if self.all == {}:
-            return [sublist for sublist in [self.output_txt, self.output_crd , self.output_cnf] if sublist]
+        if not self.all:
+            return [sublist for sublist in [self.output_txt, self.output_crd , self.output_cnf] if sublist][0]
 
         else:
             return self.all
@@ -185,3 +202,9 @@ class Recognition:
     def image_size(self):
         """return image width and height."""
         return [self.width, self.height]
+
+
+
+
+
+
