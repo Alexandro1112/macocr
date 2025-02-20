@@ -1,4 +1,4 @@
-# TextRecognitionMacOs
+# macocr
 Simple utility for recognizing text on an image, supports many languages!
 
 ▎Usage
@@ -6,7 +6,7 @@ Simple utility for recognizing text on an image, supports many languages!
 Here's a quick example of how to use recog_lib to recognize text from an image:
 
 ```
-import TextRecognitionMacOs as rc
+import macocr as rc
 
 
 rec = rc.Recognition(
@@ -34,7 +34,7 @@ Parameters
 
 ```
 
-import TextRecognitionMacOs as rc
+import macocr as rc
 
 
 rec = rc.Recognition(
