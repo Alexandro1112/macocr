@@ -1,3 +1,4 @@
+import inspect
 import Vision
 import Cocoa
 import Quartz
@@ -11,8 +12,8 @@ class Recognition:
     """
     Class create Recognition object which accept:
 
-    :argument img: The path to the required image cannot contain Cyrillic characters. Assign an image path or file name if
-     it is in the same directory.
+    :argument img: The path to the required image cannot contain Cyrillic characters. Assign an image path or file name
+    if it is in the same directory.
 
     :argument output_format:
     an explanation of what we need to return: text if we need text from the image. coordinate,
@@ -31,7 +32,16 @@ class Recognition:
     :argument img_orientation: change the image orientation, which is applied before the image is initialized
     using VNRecognizeTextRequest.
 
+    :argument **args accept object isinstance to Vision.VNRecognizeTextRequest for using function from self. Pass None
+     if function doesn't accept anything.
+
     """
+    def __getattr__(self, item):
+        metadata = item.__metadata__()['arguments']
+        signature = b''.join(item['type'] for item in metadata)
+        # b'@:@' mean that function return object not equal None;
+        if b'@:@' not in signature:
+            raise ValueError
 
     def __init__(self,
                  img: str,
@@ -40,6 +50,7 @@ class Recognition:
                  lang='en-US',
                  use_CPU=None,
                  recognition_interest: List[Tuple[float | int, float | int]] = None,
+                 **args
                  ) -> None:
 
         self.info = output_format
@@ -85,7 +96,8 @@ class Recognition:
                     return x_1, y_1, x_2, y_2
 
             if not isinstance(request.results(), Iterable) and recognition_interest is not None:
-                self.output_txt.append([]) # If we limit text recognition by coordinates, and if nothing is found at the
+                self.output_txt.append([])
+                # If we limit text recognition by coordinates, and if nothing is found at the
                 # given coordinates, then we return an empty dictionary.
                 return
 
@@ -119,15 +131,15 @@ class Recognition:
                         else:
                             return None
 
-        def recognize(img) -> None:
+        def recognize(file) -> None:
             pattern = r'[а-яА-ЯёЁ]'
-            if bool(var := re.search(pattern, img)):
+            if bool(var := re.search(pattern, file)):
                 raise SyntaxError(
                     f'The path to the file must\'t contain Cyrillic characters started on {var.start() + 1!r}.'
                 )
             try:
                 image = Vision.NSImage.alloc().initWithContentsOfFile_(
-                    Cocoa.CFSTR(img.strip())
+                    Cocoa.CFSTR(file.strip())
                 ).TIFFRepresentation()
                 size = Vision.NSImage.alloc().initWithContentsOfFile_(Cocoa.CFSTR(img.strip())).size()
 
@@ -159,12 +171,13 @@ class Recognition:
                     self.request.setRegionOfInterest_(
                         Cocoa.CGRect(*recognition_interest)
                     )
-                except objc._objc.internal_error:
+                except objc.internal_error:
                     raise ValueError(f'recognition_interest has wrong type or values.')
 
             elif recognition_interest is None:
                 self.request.setRegionOfInterest_(
-                    Cocoa.CGRect((0, 0), (1, 1)) # Set as region of searching at all image. This described there
+                    Cocoa.CGRect((0, 0), (1, 1))
+                    # Set as region of searching at all image. This described there
                     # https://developer.apple.com/documentation/dockkit/dockaccessory/setregionofinterest(_:)/
                 )
             else:
@@ -177,6 +190,21 @@ class Recognition:
             if self.use_CPU is True:
                 self.request.setUsesCPUOnly_(Vision.kCFBooleanTrue)
 
+            if args:
+                for (keys, values) in args.items():
+                    if len(inspect.signature(eval(f'self.request.{keys}')).parameters) == 0:
+                        _value = eval(
+                            'self.request.%s()' % keys
+                        )
+                        setattr(self, keys, _value)
+
+                    elif len(inspect.signature(eval(f'self.request.{keys}')).parameters) >= 1:
+                        _method = f'self.request.%s('
+                        for i in range(len(values)):
+                            _method += '%s, '
+                        _method += ')'
+                        eval(_method % (keys, *values))
+
             with objc.autorelease_pool():
                 if req_handler.isMemberOfClass_(Vision.VNImageRequestHandler):
                     req_handler.performRequests_error_([self.request], None)
@@ -188,7 +216,10 @@ class Recognition:
         """I created this method because when we try to return any data through a handle, we get an error.
          The Objc method cannot return or save any values."""
         if not self.all:
-            return [sublist for sublist in [self.output_txt, self.output_crd , self.output_cnf] if sublist][0]
+            try:
+                return [sublist for sublist in [self.output_txt, self.output_crd, self.output_cnf] if sublist][0]
+            except IndexError:
+                return []
 
         else:
             return self.all
@@ -202,9 +233,3 @@ class Recognition:
     def image_size(self):
         """return image width and height."""
         return [self.width, self.height]
-
-
-
-
-
-
