@@ -1,7 +1,8 @@
+# /usr/bin/python
 import inspect
 import Vision
-import Cocoa
 import Quartz
+import Cocoa
 import re
 from typing import Dict, SupportsFloat, SupportsInt, List, AnyStr, Tuple, Literal
 import objc
@@ -12,7 +13,7 @@ class Recognition:
     """
     Class create Recognition object which accept:
 
-    :argument img: The path to the required image cannot contain Cyrillic characters. Assign an image path or file name
+    :argument img: The path to the desired image cannot contain Cyrillic characters. Assign an image path or file name
     if it is in the same directory.
 
     :argument output_format:
@@ -37,11 +38,14 @@ class Recognition:
 
     """
     def __getattr__(self, item):
-        metadata = item.__metadata__()['arguments']
-        signature = b''.join(item['type'] for item in metadata)
-        # b'@:@' mean that function return object not equal None;
-        if b'@:@' not in signature:
-            raise ValueError
+        try:
+            metadata = item.__metadata__()['arguments']
+            signature = b''.join(item['type'] for item in metadata)
+            # b'@:@' mean that function return object not equal None;
+            if b'@:@' in signature:
+                raise ValueError
+        except AttributeError:
+            raise AttributeError('Can not get access to %s function' % repr(item))
 
     def __init__(self,
                  img: str,
@@ -58,7 +62,7 @@ class Recognition:
         self.use_CPU = use_CPU
 
         self.orientations = {
-            'default': 0,
+            'default': Quartz.kCGImagePropertyOrientationUp & -2,
             'up': Quartz.kCGImagePropertyOrientationUp,
             'down': Quartz.kCGImagePropertyOrientationDown,
             'left': Quartz.kCGImagePropertyOrientationLeft,
@@ -139,9 +143,9 @@ class Recognition:
                 )
             try:
                 image = Vision.NSImage.alloc().initWithContentsOfFile_(
-                    Cocoa.CFSTR(file.strip())
+                    Cocoa.CFSTR(file)
                 ).TIFFRepresentation()
-                size = Vision.NSImage.alloc().initWithContentsOfFile_(Cocoa.CFSTR(img.strip())).size()
+                size = Vision.NSImage.alloc().initWithContentsOfFile_(Cocoa.CFSTR(img)).size()
 
                 self.width = int(size.width)
                 self.height = int(size.height)
@@ -192,18 +196,22 @@ class Recognition:
 
             if args:
                 for (keys, values) in args.items():
-                    if len(inspect.signature(eval(f'self.request.{keys}')).parameters) == 0:
-                        _value = eval(
-                            'self.request.%s()' % keys
-                        )
-                        setattr(self, keys, _value)
+                    if keys in self.request.__dir__():
 
-                    elif len(inspect.signature(eval(f'self.request.{keys}')).parameters) >= 1:
-                        _method = f'self.request.%s('
-                        for i in range(len(values)):
-                            _method += '%s, '
-                        _method += ')'
-                        eval(_method % (keys, *values))
+                        if len(inspect.signature(eval(f'self.request.{keys}')).parameters) == 0:
+                            _value = eval(
+                                'self.request.%s()' % keys
+                            )
+                            setattr(self, keys, _value)
+
+                        elif len(inspect.signature(eval(f'self.request.{keys}')).parameters) > 1:
+                            _method = f'self.request.%s('
+                            for i in range(len(values)):
+                                _method += '%s, '
+                            _method += ')'
+                            eval(_method % (keys, *values))
+                    else:
+                        raise AttributeError
 
             with objc.autorelease_pool():
                 if req_handler.isMemberOfClass_(Vision.VNImageRequestHandler):
@@ -217,7 +225,7 @@ class Recognition:
          The Objc method cannot return or save any values."""
         if not self.all:
             try:
-                return [sublist for sublist in [self.output_txt, self.output_crd, self.output_cnf] if sublist][0]
+                return [sublist for sublist in [self.output_txt, self.output_crd, self.output_cnf] if sublist]
             except IndexError:
                 return []
 
