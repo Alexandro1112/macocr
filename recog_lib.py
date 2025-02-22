@@ -97,7 +97,7 @@ class Recognition:
                     x_2 = x_1 + w * self.width
                     y_1 = y_2 - h * self.height
 
-                    return x_1, y_1, x_2, y_2
+                    return x_1, y_2, x_2, y_1
 
             if not isinstance(request.results(), Iterable) and recognition_interest is not None:
                 self.output_txt.append([])
