@@ -87,7 +87,7 @@ class Recognition:
             Create handler for accept recognized text.
             """
             if error is not None:
-                raise Exception(f"Code : {error.code()}", error.localizedDescription())
+                raise Exception(f"Code : {bin(error.code())}", error.localizedDescription())
             del error
 
             self.all = {}
