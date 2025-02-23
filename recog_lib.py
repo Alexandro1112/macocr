@@ -46,10 +46,10 @@ class Recognition:
             metadata = item.__metadata__()['arguments']
             signature = b''.join(item['type'] for item in metadata)
             # b'@:@' mean that function return object not equal None;
-            if b'@:@' not in signature:
+            if b'@:@' not in signature or all(signature in symbols for symbols in objc._objc.splitSignature(b'@:@')):
                 raise ValueError
         except AttributeError:
-            raise AttributeError('Can not get access to %s function' % repr(item))
+            raise AttributeError('Can not get access to %s' % repr(item))
 
     def __init__(self,
                  img: str,
@@ -87,7 +87,8 @@ class Recognition:
             Create handler for accept recognized text.
             """
             if error is not None:
-                raise Exception(f"Code : {bin(error.code())}", error.localizedDescription())
+                raise Exception(
+                    f"Code : {hex(error.code())!r}", error.localizedDescription())
             del error
 
             self.all = {}
@@ -118,7 +119,6 @@ class Recognition:
 
                 if isinstance(result, Vision.VNRecognizedTextObservation):
                     for text in result.topCandidates_(1):
-
                         if len(self.info.split('+')) < 3:
 
                             if 'text' in self.info.split('+'):
@@ -147,11 +147,17 @@ class Recognition:
                             return None
 
         def recognize(file) -> None:
+            """
+            The recognize function processes an image file to recognize text using the PyObjC framework. It validates
+             the file path for Cyrillic characters, initializes image handling, sets recognition parameters,
+              and manages errors during the recognition process.
+            """
             pattern = r'[а-яА-ЯёЁ]'
             if bool(var := re.search(pattern, file)):
                 raise SyntaxError(
                     f'The path to the file must\'t contain Cyrillic characters started on {var.start() + 1!r}.'
                 )
+
             try:
                 image = Vision.NSImage.alloc().initWithContentsOfFile_(
                     Cocoa.CFSTR(file)
@@ -204,18 +210,29 @@ class Recognition:
             if self.use_CPU is True:
                 self.request.setUsesCPUOnly_(Vision.kCFBooleanTrue)
             if recognition_level is not None:
-                self.request.setRecognitionLevel_(self.levels[recognition_level])
+                self.request.setRecognitionLevel_(self.levels[recognition_level] if not 1 or 0 else 0)
 
             if args:
                 for (keys, values) in args.items():
                     if keys in self.request.__dir__():
+                        # pass name of attribute and type of returned value, for example we need to get value from
+                        # function recognitionLevel, so we pass recognitionLevel, and type (int)
+
+                        # text = macosr.Recognition(
+                        #   img='textocr.png',
+                        #    lang='en-US',
+                        #    use_CPU=True,
+                        #    recognition_level=1,
+                        #    recognitionLevel=int
+                        # )
+                        # print(text.recognitionLevel) # 1
 
                         if len(inspect.signature(eval(f'self.request.{keys}')).parameters) == 0:
                             # if function only return value and didn't accept arguments
                             _value = eval(
                                 'self.request.%s()' % keys
                             )
-                            setattr(self, keys, _value)
+                            setattr(self, keys, values(_value))
 
                         elif len(inspect.signature(eval(f'self.request.{keys}')).parameters) > 1:
                             method = f'self.request.%s('
