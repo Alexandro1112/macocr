@@ -11,30 +11,34 @@ from collections.abc import Iterable
 
 class Recognition:
     """
-    Class create Recognition object which accept:
+    The class creates a recognition object that takes:
 
-    :argument img: The path to the desired image cannot contain Cyrillic characters. Assign an image path or file name
-    if it is in the same directory.
+    :argument img: The path to the desired image cannot contain Cyrillic characters. Assign the path to the image or the
+    filename, if it is located in the same directory.
 
     :argument output_format:
-    an explanation of what we need to return: text if we need text from the image. coordinate,
-    if we need to get the coordinates of the text, confidence if we need to get the accuracy of the recognized text
+    explanation of what we need to return: text, if we need the text from the image. coordinate,
+    if we need to get the coordinates of the text, certain, if we need to get the accuracy of the recognized text
     in floating point values.
 
-    :argument lang: language of recognition text, if text contain more 2 languages keep lang at ``en-US``.
+    :argument lang: the language of text recognition, if the text contains more than 2 languages, leave lang to "en-US"
 
     :argument use_CPU: This method (or property) allows you to specify that text recognition should be performed only on
-     the central processing unit (CPU) rather than on the graphics processing unit (GPU). This can be useful in
-     certain scenarios, for example, when it is important to reduce the load on the device's hardware resources.
+     the central processing unit (CPU), and not on the graphics processing unit (GPU). This can be useful in
+    certain scenarios, for example, when it is important to reduce the load on the hardware resources of the device.
 
-    :argument recognition_interest: argument accept dict with coordinates, this is need for a limit text recognition by
-    x, y, width and height coordinates. Default values: (0, 0), (1, 1).
+    :argument recognize_interest: argument accepts a dict with coordinates, this is necessary to limit text recognition
+    by x, y, width and height coordinates. Default values: (0, 0), (1, 1).
 
-    :argument img_orientation: change the image orientation, which is applied before the image is initialized
-    using VNRecognizeTextRequest.
+    :argument img_orientation: changes the orientation of the image, which is applied before the image is initialized
+    with VNRecognizeTextRequest.
 
-    :argument **args accept object isinstance to Vision.VNRecognizeTextRequest for using function from self. Pass None
-     if function doesn't accept anything.
+    :argument **args accepts functions that belong to the VNRecognizeTextRequest class to manually change
+     and add any parameters.
+
+    :argument recognize_level: parameter that sets the recognition speed, can be 1 or 0.
+    0 - more accurate recognition,
+    1 - faster, but has low quality.
 
     """
     def __getattr__(self, item):
@@ -42,7 +46,7 @@ class Recognition:
             metadata = item.__metadata__()['arguments']
             signature = b''.join(item['type'] for item in metadata)
             # b'@:@' mean that function return object not equal None;
-            if b'@:@' in signature:
+            if b'@:@' not in signature:
                 raise ValueError
         except AttributeError:
             raise AttributeError('Can not get access to %s function' % repr(item))
@@ -52,14 +56,19 @@ class Recognition:
                  img_orientation='default',
                  output_format: Literal['text', 'coord', 'confidence'] | Iterable = 'text',
                  lang='en-US',
-                 use_CPU=None,
+                 use_CPU: bool=None,
                  recognition_interest: List[Tuple[float | int, float | int]] = None,
+                 recognition_level=0,
                  **args
                  ) -> None:
 
         self.info = output_format
         self.lang = lang
         self.use_CPU = use_CPU
+        self.levels = {
+            0: Vision.VNRequestTextRecognitionLevelAccurate,
+            1: Vision.VNRequestTextRecognitionLevelFast
+            }
 
         self.orientations = {
             'default': Quartz.kCGImagePropertyOrientationUp & -2,
@@ -78,7 +87,7 @@ class Recognition:
             Create handler for accept recognized text.
             """
             if error is not None:
-                raise Exception(error.localizedDescription())
+                raise Exception(f"Code : {error.code()}", error.localizedDescription())
             del error
 
             self.all = {}
@@ -89,13 +98,13 @@ class Recognition:
             def multiply_list(values):
                 """convert CGPoint to list with coordinates(x, y, width, and height)."""
                 for i in range(len(values)):
-                    bound_box = [round(_xy, 2) for _xy in
+                    bound_box = [_xy for _xy in
                                  (values[i].x, values[i].y, values.size.width, values.size.height)]
                     x, y, w, h = bound_box
                     x_1 = x * self.width
                     y_2 = (1 - y) * self.height
-                    x_2 = x_1 + w * self.width
-                    y_1 = y_2 - h * self.height
+                    x_2 = w * self.width
+                    y_1 = h * self.height
 
                     return x_1, y_2, x_2, y_1
 
@@ -106,8 +115,10 @@ class Recognition:
                 return
 
             for result in request.results():
+
                 if isinstance(result, Vision.VNRecognizedTextObservation):
                     for text in result.topCandidates_(1):
+
                         if len(self.info.split('+')) < 3:
 
                             if 'text' in self.info.split('+'):
@@ -163,7 +174,6 @@ class Recognition:
                 raise ValueError(
                     f'Orientation must be {repr((*self.orientations.keys(), ))}'
                 )
-
             req_handler = Vision.VNImageRequestHandler.alloc().initWithCGImage_orientation_options_(
                 cg, orient, None
             )
@@ -193,23 +203,26 @@ class Recognition:
                 self.request.setRecognitionLanguages_(lang)
             if self.use_CPU is True:
                 self.request.setUsesCPUOnly_(Vision.kCFBooleanTrue)
+            if recognition_level is not None:
+                self.request.setRecognitionLevel_(self.levels[recognition_level])
 
             if args:
                 for (keys, values) in args.items():
                     if keys in self.request.__dir__():
 
                         if len(inspect.signature(eval(f'self.request.{keys}')).parameters) == 0:
+                            # if function only return value and didn't accept arguments
                             _value = eval(
                                 'self.request.%s()' % keys
                             )
                             setattr(self, keys, _value)
 
                         elif len(inspect.signature(eval(f'self.request.{keys}')).parameters) > 1:
-                            _method = f'self.request.%s('
+                            method = f'self.request.%s('
                             for i in range(len(values)):
-                                _method += '%s, '
-                            _method += ')'
-                            eval(_method % (keys, *values))
+                                method += '%s, '
+                            method += ')'
+                            eval(method % (keys, *values))
                     else:
                         raise AttributeError
 
