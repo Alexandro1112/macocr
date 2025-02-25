@@ -66,7 +66,7 @@ print(rec.return_results())
 Run the tool from the command line with the following syntax:
 
 ```
-python your_script_name.py --img <path_to_image> --lang <language_code> --img_orientation <orientation> --output_format <format> --recognition_interest <coordinates>
+python recog_util.py --img <path_to_image> --lang <language_code> --img_orientation <orientation> --output_format <format> --recognition_interest <coordinates>
 ```
 
 
@@ -91,6 +91,6 @@ python your_script_name.py --img <path_to_image> --lang <language_code> --img_or
 To recognize text from an image located at image.jpg with English language support, you can run:
 
 ```
-python your_script_name.py --img image.jpg --lang en-US --img_orientation up --output_format text 
+python recog_util.py --img image.jpg --lang en-US --img_orientation up --output_format text 
 ```
 
