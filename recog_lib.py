@@ -7,7 +7,6 @@ import re
 from typing import Dict, SupportsFloat, SupportsInt, List, AnyStr, Tuple, Literal
 import numpy
 import objc
-import cv2
 from collections.abc import Iterable
 import io
 from PIL import Image
@@ -56,7 +55,7 @@ class Recognition:
             raise AttributeError('Can not get access to %s' % repr(item))
 
     def __init__(self,
-                 img: str,
+                 img: str | type(numpy.array),
                  img_orientation='default',
                  output_format: Literal['text', 'coord', 'confidence'] | Iterable = 'text',
                  lang='en-US',
@@ -102,8 +101,7 @@ class Recognition:
             def multiply_list(values):
                 """convert CGPoint to list with coordinates(x, y, width, and height)."""
                 for i in range(len(values)):
-                    bound_box = [_xy for _xy in
-                                 (values[i].x, values[i].y, values.size.width, values.size.height)]
+                    bound_box = [_xy for _xy in (values[i].x, values[i].y, values.size.width, values.size.height)]
                     if isinstance(img, str):
                         x, y, w, h = bound_box
                         x_1 = x * self.width
@@ -200,14 +198,14 @@ class Recognition:
                 def numpy_array_to_ns_data(image_array):
                     """Convert a NumPy array to NSData."""
                     pil_image = Image.fromarray(image_array)
+
                     with io.BytesIO() as output:
                         pil_image.save(output, format='PNG', save_all=True)
                         data = output.getvalue()
+
                     return Cocoa.NSData.dataWithBytes_length_(data, len(data))
 
-                rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGBA)
-
-                image_bytes = numpy_array_to_ns_data(rgb)
+                image_bytes = numpy_array_to_ns_data(img)
 
                 ns_data_image = Cocoa.NSData.dataWithBytes_length_(image_bytes, len(image_bytes))
 
