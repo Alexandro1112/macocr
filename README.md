@@ -60,6 +60,22 @@ print(rec.return_results())
 
 <br> 
 
+<br> Macocr can interact with cv2. For example, we can capture an image from the camera and output all the recognized text from it.
+```
+import macocr
+import cv2
+import numpy
+
+while True:
+    cap = cv2.VideoCapture(0)
+    _, data = cap.read()
+    ocr = macocr.Recognition(img=data, use_CPU=True)
+    if ocr.return_results():
+        print(f'Text is: {ocr.return_results()}')
+    cv2.waitKey(1)
+```
+<br> 
+
 
 ▎Usage recog_util.py
 
