@@ -141,13 +141,14 @@ class Recognition:
                                 self.all = {}
 
                             elif 'confidence' in self.info.split('+'):
-                                self.output_cnf.append(text.confidence())
+                                self.output_cnf.append(text.confidence() * 100)
                                 self.all = {}
 
                         elif all(word in self.info for word in ['text', 'coord', 'confidence']):
                             self.output_txt.append(text.string())
                             self.output_crd.append(multiply_list(result.boundingBox()))
-                            self.output_cnf.append(result.confidence())
+                            self.output_cnf.append(result.confidence() * 100
+                                                  )
                             self.all.update({
                                     'coord': self.output_crd,
                                     'text': self.output_txt,
@@ -184,7 +185,7 @@ class Recognition:
                     self.height = int(size.height)
 
                 except AttributeError:
-                    raise FileNotFoundError(f'Failed to load image {img.__repr__()}') from None
+                    raise FileNotFoundError(f'Failed to load image {repr(img)}') from None
 
                 cg = Cocoa.NSBitmapImageRep.imageRepWithData_(
                     image
